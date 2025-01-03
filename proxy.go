@@ -6,16 +6,13 @@ import (
 )
 
 type Row interface {
+	scanner
 	Err() error
-	Scan(dest ...interface{}) error
 }
 
 type Rows interface {
 	Row
 	Next() bool
-	SliceScan() ([]interface{}, error)
-	MapScan(dest map[string]interface{}) error
-	StructScan(dest interface{}) error
 	Close() error
 }
 
@@ -124,4 +121,11 @@ type preparer interface {
 type namedPreparer interface {
 	PrepareNamed(query string) (NamedStmt, error)
 	PrepareNamedContext(ctx context.Context, query string) (NamedStmt, error)
+}
+
+type scanner interface {
+	Scan(dest ...interface{}) error
+	SliceScan() ([]interface{}, error)
+	MapScan(dest map[string]interface{}) error
+	StructScan(dest interface{}) error
 }
