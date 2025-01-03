@@ -3,9 +3,11 @@ package sqlx
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"github.com/adanyl0v/sqlproxy"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/jmoiron/sqlx"
+	"time"
 )
 
 const driverName = "pgx"
@@ -323,8 +325,35 @@ func (db *DB) Begin() (sqlproxy.Tx, error) {
 	return &Tx{x: tx}, nil
 }
 
+type Config struct {
+	Host         string
+	Port         int
+	User         string
+	Password     string
+	Database     string
+	SslMode      string
+	MaxOpenConns int
+	MaxIdleConns int
+	ConnLifetime time.Duration
+	ConnIdleTime time.Duration
+}
+
+func (c *Config) DataSourceName() string {
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		c.User, c.Password, c.Host, c.Port, c.Database, c.SslMode)
+}
+
 func Open(dataSourceName string) (*DB, error) {
 	db, err := sqlx.Open(driverName, dataSourceName)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DB{x: db}, nil
+}
+
+func OpenWithConfig(c *Config) (*DB, error) {
+	db, err := sqlx.Open(driverName, c.DataSourceName())
 	if err != nil {
 		return nil, err
 	}
@@ -348,4 +377,39 @@ func ConnectContext(ctx context.Context, dataSourceName string) (*DB, error) {
 	}
 
 	return &DB{x: db}, nil
+}
+
+func ConnectWithConfig(c *Config) (*DB, error) {
+	db, err := sqlx.Connect(driverName, c.DataSourceName())
+	if err != nil {
+		return nil, err
+	}
+
+	setConfig(db, c)
+	return &DB{x: db}, nil
+}
+
+func ConnectContextWithConfig(ctx context.Context, c *Config) (*DB, error) {
+	db, err := sqlx.ConnectContext(ctx, driverName, c.DataSourceName())
+	if err != nil {
+		return nil, err
+	}
+
+	setConfig(db, c)
+	return &DB{x: db}, nil
+}
+
+func setConfig(db *sqlx.DB, c *Config) {
+	if c.MaxOpenConns > 0 {
+		db.SetMaxOpenConns(c.MaxOpenConns)
+	}
+	if c.MaxIdleConns > 0 {
+		db.SetMaxIdleConns(c.MaxIdleConns)
+	}
+	if c.ConnLifetime > 0 {
+		db.SetConnMaxLifetime(c.ConnLifetime)
+	}
+	if c.ConnIdleTime > 0 {
+		db.SetConnMaxIdleTime(c.ConnIdleTime)
+	}
 }
